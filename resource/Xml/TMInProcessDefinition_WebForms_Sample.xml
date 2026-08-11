@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE TMD[
+  <!ELEMENT TMD (Transmission*)>
+  <!ELEMENT Transmission EMPTY>
+  <!ATTLIST Transmission id ID #REQUIRED assemblyName CDATA #REQUIRED className CDATA #REQUIRED>
+]>
+<!-- idの先頭には、数字を使用できない。 -->
+<!--
+  WebForms_Sample 専用のインプロセス名前解決定義。
+
+  2層化（ws-decouple）では、共有の TMInProcessDefinition.xml が WSServer_sample を指すため
+  アプリ同梱 B層へ向け直す用途で作成した。その後の最小化（minimize）で
+  サンプル B層（WebForms_Sample.LayerB）ごと削除したので、エントリは空にしてある
+  （消えたクラスを指したまま残すと「静かに腐る」＝ビルドでも実行でも露見しない）。
+
+  CallController.Invoke(<サービス論理名>, …) で B層を呼ぶ画面を追加したら、ここに追記する。
+  書式：
+  <Transmission id="<サービス論理名>" assemblyName="WebForms_Sample" className="WebForms_Sample.<B層クラス>" />
+-->
+<TMD>
+</TMD>

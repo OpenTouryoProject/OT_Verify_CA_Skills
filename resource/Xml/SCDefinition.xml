@@ -1,0 +1,34 @@
+﻿<?xml version="1.0" encoding="utf-8" ?>
+<!DOCTYPE SCD[
+	<!ELEMENT SCD (Screen*, CmnTransition*)>
+	<!ELEMENT Screen (Transition*)>
+	<!ELEMENT Transition EMPTY>
+	<!ELEMENT CmnTransition EMPTY>
+	<!ATTLIST Screen
+		value CDATA #REQUIRED
+		directLink (allow|deny) "allow">
+	<!ATTLIST Transition
+		value CDATA #REQUIRED
+		label CDATA #REQUIRED
+		mode  (T|R) #IMPLIED>
+	<!ATTLIST CmnTransition
+		value CDATA #REQUIRED
+		label ID #REQUIRED
+		mode  (T|R) #IMPLIED>
+]>
+<!-- Screenタグの現画面の仮想パスはIDにできるが、
+「/」を含むため、XMLのIDとしては利用できない。 -->
+<!--
+  最小化（minimize）で ~/Aspx/testScreenCtrl/* の画面を削除したため、
+  それを指す Screen / Transition / CmnTransition のエントリを除去した。
+  （削除済み画面を指す定義が残っても、呼ぶ画面も消えているためビルドでも
+    実行でも露見せず「静かに腐る」＝画面を消したらこの定義も掃除する。）
+  業務画面を足したら、ここに Screen / Transition を追加する。
+-->
+<SCD>
+	<Screen value="~/Aspx/start/login.aspx" directLink="allow">
+		<Transition value="~/Aspx/start/menu.aspx" label="menu"/>
+	</Screen>
+	<Screen value="~/Aspx/start/menu.aspx" directLink="allow">
+	</Screen>
+</SCD>
