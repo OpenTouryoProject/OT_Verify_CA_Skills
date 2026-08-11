@@ -1,3 +1,4 @@
+<!-- opentouryo-agent-assets:generated -->
 <!--
   このファイルは OpenTouryo を利用するアプリ開発リポジトリへ配布される
   「概要」インストラクションの原本（Single Source of Truth）です。
