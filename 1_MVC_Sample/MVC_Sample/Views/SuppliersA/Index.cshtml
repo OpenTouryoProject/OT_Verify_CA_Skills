@@ -1,0 +1,63 @@
+﻿@*
+    //**********************************************************************************
+    //* マスタ・テーブル（Suppliers）サンプル（Ｐ層）
+    //**********************************************************************************
+
+    //**********************************************************************************
+    //* クラス名        ：Index
+    //* クラス日本語名  ：画面Ａ（件数確認・画面遷移）
+    //*
+    //* 作成日時        ：2026/08/12
+    //* 作成者          ：コーディング エージェント
+    //* 更新履歴        ：
+    //*
+    //*  日時        更新者            内容
+    //*  ----------  ----------------  -------------------------------------------------
+    //*  2026/08/12  コーディング Ａ   新規作成
+    //*  2026/08/12  コーディング Ａ   フッタ ボタンを form 属性でフォームに紐付け（押下不能の修正）
+    //**********************************************************************************
+*@
+
+@using MVC_Sample.Models.ViewModels
+@model SuppliersViewModel
+
+@{
+    ViewBag.Title = "Suppliers 画面Ａ";
+}
+
+@section HeaderScriptsSection{
+    <!-- Head 部の section -->
+}
+
+<h4>Suppliers 画面Ａ</h4>
+<p>［件数確認］で Suppliers のデータ件数を OK メッセージ ダイアログに表示します。［画面遷移］で画面Ｂへ遷移します。</p>
+
+@using (Html.BeginForm("SelectCount", "SuppliersA", FormMethod.Post, new { id = "formA" }))
+{
+    @Html.AntiForgeryToken()
+}
+
+@* フッタ部のメイン ボタン5つ（キャプションは画面ごと、不要なものは disabled）。
+   ダイアログ表示は JavaScript 機能を使用する。
+
+   ★ このセクションはレイアウトの @@RenderSection の位置（＝@@RenderBody の外）に描画されるので、
+     上の <form> の「中」には入らない。submit ボタンはフォームの外に置くと押しても何も起きないため、
+     HTML5 の form 属性でフォーム ID を明示して紐付ける。 *@
+@section FooterButtonsSection{
+    <button type="submit" form="formA" class="btn btn-primary" name="btnMain1" id="btnMain1">件数確認</button>
+    <button type="button" class="btn btn-secondary" name="btnMain2" id="btnMain2"
+            onclick="location.href='@Url.Action("Index", "SuppliersB")';">画面遷移</button>
+    <button type="button" class="btn btn-secondary" name="btnMain3" id="btnMain3" disabled>－</button>
+    <button type="button" class="btn btn-secondary" name="btnMain4" id="btnMain4" disabled>－</button>
+    <button type="button" class="btn btn-secondary" name="btnMain5" id="btnMain5" disabled>－</button>
+}
+
+@section FooterScriptsSection{
+    <script type="text/javascript">
+        // OK メッセージ ダイアログ（MVC は JavaScript 機能を使用する）
+        @if (!string.IsNullOrEmpty(Model.Message))
+        {
+            <text>window.alert('@Html.Raw(HttpUtility.JavaScriptStringEncode(Model.Message))');</text>
+        }
+    </script>
+}
