@@ -11,4 +11,8 @@
   <Transmission id="testWebService2" assemblyName="WSServer_sample" className="WSServer_sample.Business.LayerB" />
   <Transmission id="testWebService3" assemblyName="WSServer_sample" className="WSServer_sample.Business.LayerB" />
   <Transmission id="testWebService4" assemblyName="WSServer_sample" className="WSServer_sample.Business.LayerB" />
+  
+  <Transmission id="suppliersInProcess"   assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
+  <Transmission id="suppliersWebService1" assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
+  <Transmission id="suppliersWebService2" assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
 </TMD>

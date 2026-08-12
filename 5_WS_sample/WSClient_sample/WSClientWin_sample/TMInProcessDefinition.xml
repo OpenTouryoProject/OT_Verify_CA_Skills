@@ -12,7 +12,7 @@
   <Transmission id="testWebService3" assemblyName="WSServer_sample" className="WSServer_sample.Business.LayerB" />
   <Transmission id="testWebService4" assemblyName="WSServer_sample" className="WSServer_sample.Business.LayerB" />
   
-  <Transmission id="dtoWebService" assemblyName="dummy" className="WSServer_sample.Business.LayerB_dto" />
-  <Transmission id="sbWebService" assemblyName="dummy" className="WSServer_sample.Web.Business.LayerB_mu" />
-  <Transmission id="jsonController" assemblyName="dummy" className="WSServer_sample.Web.Business.LayerB_mu" />
+  <Transmission id="suppliersInProcess"   assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
+  <Transmission id="suppliersWebService1" assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
+  <Transmission id="suppliersWebService2" assemblyName="WSServer_sample" className="WSServer_sample.Business.SuppliersLayerB" />
 </TMD>

@@ -1,4 +1,4 @@
-//**********************************************************************************
+﻿//**********************************************************************************
 //* ３層型 サンプル アプリ画面
 //**********************************************************************************
 
@@ -47,6 +47,22 @@ namespace WSClientWin_sample
         {
             InitializeComponent();
             ServicePointManager.SecurityProtocol = SecurityProtocolType.Tls | SecurityProtocolType.Tls11 | SecurityProtocolType.Tls12;
+
+            // Suppliers（マスタ・テーブル サンプル）画面Ａへの入口。
+            // 接頭辞 btn なのでフレームワークが自動結線する（→ UOC_btnSuppliers_Click）。
+            // ★ コントロールの追加はコンストラクタで行う。
+            //   BaseControllerWin は「コントロール検索＆イベントハンドラ設定
+            //   （RcFxCmnFunction.GetCtrlAndSetClickEventHandler2）」を済ませてから
+            //   UOC_CMNFormInit() → UOC_FormInit() を呼ぶので、
+            //   UOC_FormInit() の中で足したコントロールは走査済み＝結線されない。
+            this.btnSuppliers = new System.Windows.Forms.Button();
+            this.btnSuppliers.Name = "btnSuppliers";
+            this.btnSuppliers.Text = "Suppliers";
+            this.btnSuppliers.Size = new System.Drawing.Size(110, 26);
+            this.btnSuppliers.Location = new System.Drawing.Point(this.ClientSize.Width - 122, 6);
+            this.btnSuppliers.Anchor = System.Windows.Forms.AnchorStyles.Top | System.Windows.Forms.AnchorStyles.Right;
+            this.Controls.Add(this.btnSuppliers);
+            this.btnSuppliers.BringToFront();
         }
 
         /// <summary>
@@ -191,6 +207,20 @@ namespace WSClientWin_sample
         /// 非同期フレームワークを使用してB層の呼び出し処理を非同期化
         /// （非同期実行、結果表示の双方に匿名デリゲードを使用するパターン）
         /// </remarks>
+        /// <summary>Suppliers（マスタ・テーブル サンプル）画面Ａを開くボタン</summary>
+        private System.Windows.Forms.Button btnSuppliers;
+
+        /// <summary>［Suppliers］Suppliers 画面Ａを開く</summary>
+        /// <param name="rcFxEventArgs">イベントハンドラの共通引数</param>
+        protected void UOC_btnSuppliers_Click(RcFxEventArgs rcFxEventArgs)
+        {
+            using (WSClientWin_sample.Suppliers.SuppliersFormA formA
+                = new WSClientWin_sample.Suppliers.SuppliersFormA())
+            {
+                formA.ShowDialog(this);
+            }
+        }
+
         protected void UOC_btnButton1_Click(RcFxEventArgs rcFxEventArgs)
         {
             // ↓カバレージ上げ
