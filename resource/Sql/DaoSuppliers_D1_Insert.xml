@@ -1,7 +1,7 @@
-<?xml version="1.0" encoding="UTF-8" ?>
+﻿<?xml version="1.0" encoding="utf-8" ?>
 <ROOT>
   -- DaoSuppliers_D1_Insert
-  -- 2013/1/10 日立 太郎
+  -- 2026/8/12 日立 太郎
   INSERT INTO 
     [Suppliers]
       (
@@ -23,18 +23,18 @@
   VALUES
       (
         <DELCMA>
-          <IF>@SupplierID,</IF>
-          <IF>@CompanyName,</IF>
-          <IF>@ContactName,</IF>
-          <IF>@ContactTitle,</IF>
-          <IF>@Address,</IF>
-          <IF>@City,</IF>
-          <IF>@Region,</IF>
-          <IF>@PostalCode,</IF>
-          <IF>@Country,</IF>
-          <IF>@Phone,</IF>
-          <IF>@Fax,</IF>
-          <IF>@HomePage,</IF>
+          <IF>@SupplierID,<ELSE></ELSE></IF>
+          <IF>@CompanyName,<ELSE></ELSE></IF>
+          <IF>@ContactName,<ELSE></ELSE></IF>
+          <IF>@ContactTitle,<ELSE></ELSE></IF>
+          <IF>@Address,<ELSE></ELSE></IF>
+          <IF>@City,<ELSE></ELSE></IF>
+          <IF>@Region,<ELSE></ELSE></IF>
+          <IF>@PostalCode,<ELSE></ELSE></IF>
+          <IF>@Country,<ELSE></ELSE></IF>
+          <IF>@Phone,<ELSE></ELSE></IF>
+          <IF>@Fax,<ELSE></ELSE></IF>
+          <IF>@HomePage,<ELSE></ELSE></IF>
         </DELCMA>
       )
 </ROOT>

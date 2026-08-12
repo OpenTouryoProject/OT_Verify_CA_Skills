@@ -1,8 +1,9 @@
--- DaoSuppliers_S1_Insert
--- 2013/1/10 日立 太郎
+﻿-- DaoSuppliers_S1_Insert
+-- 2026/8/12 日立 太郎
 INSERT INTO 
   [Suppliers]
     (
+      [SupplierID],
       [CompanyName],
       [ContactName],
       [ContactTitle],
@@ -17,6 +18,7 @@ INSERT INTO
     )
 VALUES
     (
+      @SupplierID,
       @CompanyName,
       @ContactName,
       @ContactTitle,
