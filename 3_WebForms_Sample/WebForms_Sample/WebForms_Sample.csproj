@@ -351,6 +351,9 @@
     <Content Include="Scripts\WebForms\WebUIValidation.js" />
     <Content Include="Web.config" />
     <Content Include="Bundle.config" />
+      <Content Include="Aspx\Common\Master\businessScreen.master" />
+      <Content Include="Aspx\Suppliers\SuppliersA.aspx" />
+      <Content Include="Aspx\Suppliers\SuppliersB.aspx" />
   </ItemGroup>
   <ItemGroup>
     <Compile Include="App_Start\BundleConfig.cs" />
@@ -422,6 +425,17 @@
       <DependentUpon>Global.asax</DependentUpon>
     </Compile>
     <Compile Include="Properties\AssemblyInfo.cs" />
+      <Compile Include="AppCode\Suppliers\Common\SuppliersParameterValue.cs" />
+      <Compile Include="AppCode\Suppliers\Common\SuppliersReturnValue.cs" />
+      <Compile Include="AppCode\Suppliers\Dao\DaoSuppliers.cs" />
+      <Compile Include="AppCode\Suppliers\Dao\SuppliersDao.cs" />
+      <Compile Include="AppCode\Suppliers\Business\SuppliersLayerB.cs" />
+      <Compile Include="Aspx\Common\Master\businessScreen.master.cs"><DependentUpon>businessScreen.master</DependentUpon><SubType>ASPXCodeBehind</SubType></Compile>
+      <Compile Include="Aspx\Common\Master\businessScreen.master.designer.cs"><DependentUpon>businessScreen.master</DependentUpon></Compile>
+      <Compile Include="Aspx\Suppliers\SuppliersA.aspx.cs"><DependentUpon>SuppliersA.aspx</DependentUpon><SubType>ASPXCodeBehind</SubType></Compile>
+      <Compile Include="Aspx\Suppliers\SuppliersA.aspx.designer.cs"><DependentUpon>SuppliersA.aspx</DependentUpon></Compile>
+      <Compile Include="Aspx\Suppliers\SuppliersB.aspx.cs"><DependentUpon>SuppliersB.aspx</DependentUpon><SubType>ASPXCodeBehind</SubType></Compile>
+      <Compile Include="Aspx\Suppliers\SuppliersB.aspx.designer.cs"><DependentUpon>SuppliersB.aspx</DependentUpon></Compile>
   </ItemGroup>
   <ItemGroup>
     <Folder Include="App_Data\" />
