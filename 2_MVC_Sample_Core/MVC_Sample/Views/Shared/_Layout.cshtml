@@ -82,12 +82,22 @@
                             <li onclick="window.location.href = '@Url.Content("~/")';">
                                 <i class="fa fa-arrow-circle-right"></i> メニュー２
                             </li>
+                            <li onclick="window.location.href = '@Url.Content("~/SuppliersA")';">
+                                <i class="fa fa-arrow-circle-right"></i> Suppliers（画面Ａ）
+                            </li>
                         }
                     </ul>
                 </div>
             </div>
             <div id="contents" class="col-sm-8 col-md-9">
                 @RenderBody()
+
+                @* 共通レイアウト：メイン ボタンはフッタ部に5つ。
+                   キャプションと活性/非活性は画面ごとに FooterButtonsSection で差し替える。
+                   既存画面（Crud1/Crud2/Home/Error）はセクションを定義しないので required: false。 *@
+                <div class="footer-buttons" style="border-top: 1px solid #ddd; margin-top: 16px; padding-top: 12px;">
+                    @await RenderSectionAsync("FooterButtonsSection", required: false)
+                </div>
             </div>
         </div>
     </div>
