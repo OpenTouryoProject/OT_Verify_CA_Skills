@@ -13,11 +13,11 @@
 //*  日時        更新者            内容
 //*  ----------  ----------------  -------------------------------------------------
 //*  2026/08/12  コーディング Ａ   新規作成
+//*  2026/08/19  コーディング Ａ   Session の直列化を DTTables JSON へ変更
 //**********************************************************************************
 
 using System;
 using System.Data;
-using System.IO;
 using System.Threading.Tasks;
 
 using Microsoft.AspNetCore.Authentication.Cookies;
@@ -31,6 +31,7 @@ using MVC_Sample.Models.ViewModels;
 
 using Touryo.Infrastructure.Business.Presentation;
 using Touryo.Infrastructure.Public.Db;
+using Touryo.Infrastructure.Public.Dto;
 
 namespace MVC_Sample.Controllers
 {
@@ -39,19 +40,18 @@ namespace MVC_Sample.Controllers
     /// バッチ更新は DataRow の RowState（Added / Modified / Deleted）で CUD を振り分ける。
     /// Web は複数ポストバックに跨って編集するため、編集中の DataTable を Session に保持する。
     ///
-    /// ★ ASP.NET Core の Session は byte[] しか持てない（net48 のようにオブジェクトを直接置けない）。
-    ///   JSON 直列化では RowState と「変更前の値」が落ちてバッチ更新が成立しないので、
-    ///   スキーマ（WriteXmlSchema）＋差分（WriteXml の DiffGram）で往復させる。
-    ///   DiffGram は RowState と DataRowVersion.Original を保持する。
+    /// ★ ASP.NET Core の Session は string / byte[] しか持てない（net48 のようにオブジェクトを直接置けない）。
+    ///   基盤の DTTables を JSON にして往復させる（Touryo.Infrastructure.Public.Dto）。
+    ///   DTTables は RowState と、削除行の DataRowVersion.Original を保持する。
     /// </remarks>
     [Authorize(AuthenticationSchemes = CookieAuthenticationDefaults.AuthenticationScheme)]
     public class SuppliersBController : MyBaseMVControllerCore
     {
-        /// <summary>編集中 DataTable の Session キー（スキーマ）</summary>
-        private const string SessionKeySchema = "SuppliersEditingSchema";
+        /// <summary>編集中 DataTable の Session キー</summary>
+        private const string SessionKey = "SuppliersEditing";
 
-        /// <summary>編集中 DataTable の Session キー（DiffGram）</summary>
-        private const string SessionKeyDiff = "SuppliersEditingDiffGram";
+        /// <summary>編集中 DataTable の表名（DataSet 内での識別子）</summary>
+        private const string TableName = "Suppliers";
 
         #region Session への DataTable の出し入れ
 
@@ -59,15 +59,22 @@ namespace MVC_Sample.Controllers
         /// <returns>編集中の DataTable（無ければ null）</returns>
         private DataTable LoadEditingTable()
         {
-            string schema = this.HttpContext.Session.GetString(SuppliersBController.SessionKeySchema);
-            string diff = this.HttpContext.Session.GetString(SuppliersBController.SessionKeyDiff);
-            if (string.IsNullOrEmpty(schema) || string.IsNullOrEmpty(diff)) { return null; }
+            string json = this.HttpContext.Session.GetString(SuppliersBController.SessionKey);
+            if (string.IsNullOrEmpty(json)) { return null; }
 
-            DataSet ds = new DataSet();
-            using (StringReader sr = new StringReader(schema)) { ds.ReadXmlSchema(sr); }
-            using (StringReader sr = new StringReader(diff)) { ds.ReadXml(sr, XmlReadMode.DiffGram); }
+            DataTable dt = DTTables.JsonToDTTables(json).ToDataSet()
+                .Tables[SuppliersBController.TableName];
 
-            return ds.Tables["Suppliers"];
+            // ★ DTTables の往復では「列スキーマ」が落ちる（実測）。
+            //   復元されるのは 列名・型・値・RowState までで、
+            //   AutoIncrement / AutoIncrementSeed / AutoIncrementStep / PrimaryKey / AllowDBNull は
+            //   既定値（False / 0 / 1 / なし / True）に戻る。
+            //   B層の一覧取得が仕込んだ「IDENTITY 列の負値 仮採番」もここで失われるため、
+            //   取り出すたびに掛け直す。掛け直さないと、次の［行追加］で SupplierID が
+            //   DBNull のまま追加され（例外にはならない）、仮採番の約束が静かに崩れる。
+            SuppliersBController.RestoreTempNumbering(dt);
+
+            return dt;
         }
 
         /// <summary>編集中の DataTable を Session へ格納する</summary>
@@ -76,25 +83,50 @@ namespace MVC_Sample.Controllers
         {
             if (dt == null)
             {
-                this.HttpContext.Session.Remove(SuppliersBController.SessionKeySchema);
-                this.HttpContext.Session.Remove(SuppliersBController.SessionKeyDiff);
+                this.HttpContext.Session.Remove(SuppliersBController.SessionKey);
                 return;
             }
 
             DataSet ds = new DataSet();
             ds.Tables.Add(dt.Copy());
 
-            using (StringWriter sw = new StringWriter())
+            this.HttpContext.Session.SetString(
+                SuppliersBController.SessionKey,
+                DTTables.DTTablesToJson(DTTables.FromDataSet(ds)));
+        }
+
+        /// <summary>IDENTITY 列（SupplierID）の負値 仮採番を掛け直す</summary>
+        /// <param name="dt">Session から取り出した DataTable</param>
+        /// <remarks>
+        /// シードは -1 固定ではなく「既にある最小の仮採番値 - 1」にする。
+        /// -1 固定にすると、往復のたびに採番が -1 に巻き戻り、
+        /// 2行目以降の追加行が -1 で重複する（実測）。
+        /// PrimaryKey は掛け直さない（DB 側の主キーが本体で、ここでは DataTable の
+        /// クライアント側制約に過ぎない。仮採番中の行に制約を掛けても得が無い）。
+        /// </remarks>
+        private static void RestoreTempNumbering(DataTable dt)
+        {
+            if (dt == null) { return; }
+
+            DataColumn pk = dt.Columns["SupplierID"];
+            if (pk == null) { return; }
+
+            long nextSeed = -1;
+
+            foreach (DataRow dr in dt.Rows)
             {
-                ds.WriteXmlSchema(sw);
-                this.HttpContext.Session.SetString(SuppliersBController.SessionKeySchema, sw.ToString());
+                // 削除行は現在値を持たない。仮採番行（Added）が削除されることもあるが、
+                // その値を使い回しても実害が無いのでここでは見ない。
+                if (dr.RowState == DataRowState.Deleted) { continue; }
+                if (dr["SupplierID"] == DBNull.Value) { continue; }
+
+                long value = Convert.ToInt64(dr["SupplierID"]);
+                if (value <= nextSeed) { nextSeed = value - 1; }
             }
-            using (StringWriter sw = new StringWriter())
-            {
-                // DiffGram は RowState と変更前の値を保持する（WriteSchema／IgnoreSchema では落ちる）
-                ds.WriteXml(sw, XmlWriteMode.DiffGram);
-                this.HttpContext.Session.SetString(SuppliersBController.SessionKeyDiff, sw.ToString());
-            }
+
+            pk.AutoIncrement = true;
+            pk.AutoIncrementSeed = nextSeed;
+            pk.AutoIncrementStep = -1;
         }
 
         #endregion
@@ -170,7 +202,8 @@ namespace MVC_Sample.Controllers
             this.ReadRowsIntoTable(dt, model);
 
             DataRow newRow = dt.NewRow();
-            // SupplierID は IDENTITY 列＝DataTable 上は負値で仮採番される（B層で設定済み）
+            // SupplierID は IDENTITY 列＝DataTable 上は負値で仮採番される
+            // （B層の一覧取得で仕込み、Session から取り出すたびに LoadEditingTable で掛け直している）
             dt.Rows.Add(newRow);
 
             this.SaveEditingTable(dt);
