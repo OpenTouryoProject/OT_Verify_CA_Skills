@@ -41,6 +41,9 @@ metadata:
 
 - **`Added`** → `S1_Insert()`（**全列必須**＝生成 INSERT が全列に `@param` を持つ。列を1つでも設定しないと実行時エラー）。
   **一覧が全列でないなら `D1_Insert()`**（動的＝設定した列だけ INSERT する。生成 SQL を読んで判断＝`opentouryo-dao-generated`）。
+  **★ IDENTITY（自動採番）列があるテーブルは列数に関わらず `D1_Insert()` 一択**——DaoGen CLI の `S1_Insert` は
+  **生成時に IDENTITY 列も列リスト/VALUES に含める**ため、そのまま実行すると `IDENTITY_INSERT が OFF…` で必ず失敗する
+  （実測。本体同梱の手直し版 `.sql` は IDENTITY を除いている）。`D1_Insert()` で IDENTITY 列を設定しなければ回避できる。
 - **`Modified`** → `PK_列` を設定、`Set_列_forUPD` に**現在値**、WHERE 用の列は**元の値**（下記）→ `S3_Update()` / `D3_Update()`。
 - **`Deleted`** → `PK_列` を設定 → `S4_Delete()` / `D4_Delete()`。
 
@@ -59,6 +62,10 @@ metadata:
 > ①**IDENTITY 主キーは `S1_Insert()` で採番値が `DataTable` に戻らない**→ 反映後は一覧を再 SELECT して返す（追加直後の行に続けて操作しない）。
 > ②同じキーを使い回すなら `switch(dr.RowState)` は **Deleted → Added の順**（Added を先に流すと旧行と衝突）。
 > ③楽観排他は取得時の値を WHERE に入れて件数0で検知（タイムスタンプ列が無ければ全列 `Original`・`NULL`→`IS NULL`）。
+> **★ `text`/`ntext`/`image` 列があると「全列 `Original` を WHERE」は使えない**——SQL Server はこれらを `=` 比較できず
+> `Msg 402`（`ntext と nvarchar は equal to 演算子では互換性がありません`）で落ちる（実測。`Suppliers.HomePage`＝ntext）。
+> この場合は**主キーのみ WHERE の `S3_Update`/`S4_Delete`** に留める（＝件数0で「他者が先に削除」は検知できるが Lost Update は検知不能）か、
+> **`rowversion`/`timestamp` 列の追加を検討**する。
 
 ## 反映後の後始末
 
@@ -70,6 +77,34 @@ metadata:
 Web で複数回のポストバックに跨って編集する場合、**編集中の `DataTable` を `Session` などに保持**する
 （`RowState` を保つため）。**サーバ メモリの消費に注意**（大きなデータを持たない・使用後は消す）。
 **StateServer/SQLServer セッション モードなら保持する型は直列化可能に**（`DataTable` は可。`opentouryo-config`）。
+
+### DataSet/DataTable を JSON 化して持つ（Session 格納・WebAPI 転送）
+
+**この直列化が要るのは net10.0（Core）の Session だけ。** net48 は `DataSet`/`DataTable` が binary シリアライズ可能で、
+**InProc は object を直接保持・StateServer/SQLServer も BinaryFormatter で自動直列化＝`RowState` も `DataRowVersion.Original` も保たれ手当て不要**。
+一方 **net10.0（Core）の `ISession` は `byte[]`/`string` しか持てず BinaryFormatter も無い**ので、`DataSet`/`DataTable` を Session に置くには
+自前で直列化する＝**フレームワークの `DTTables`（`Touryo.Infrastructure.Public.Dto`）で JSON 化する**（素朴な `System.Text.Json` は `RowState` も変更前値も落とすので使わない）：
+
+```csharp
+string json = DTTables.DTTablesToJson(DTTables.FromDataSet(ds));   // DataTable 単体は DTTable.FromDataTable(dt)
+session.SetString("edit", json);                                    // 復元：DTTables.JsonToDTTables(json).ToDataSet()
+```
+
+**`RowState`（Added/Modified/Deleted/Unchanged）は往復で保持**＝Session 復元後もバッチ CUD の振り分けができる。
+**同じ API で WebAPI の `DataSet`/`DataTable` ⇄ JSON 転送にも使える**（`RowState` が相手に届くので、受信側で INSERT/UPDATE/DELETE を振り分けられる）。
+
+**★ 変更前値（`DataRowVersion.Original`）は既定では往復で保たれない**が、**`DTTable.FromDataTable(dt, keepOriginal: true)` を渡せば保持できる**（#567）：
+
+```csharp
+DTTables dtts = new DTTables();
+foreach (DataTable dt in ds.Tables) dtts.Add(DTTable.FromDataTable(dt, keepOriginal: true));  // ← FromDataSet には引数が無い
+string json = DTTables.DTTablesToJson(dtts);   // Modified 行だけ変更前セルも載る（転送量はほぼ増えない）
+```
+
+`keepOriginal: true` なら往復後も `Original ≠ Current` が復元され、**「全列 `Original` を WHERE に入れる」楽観排他が Session/JSON 往復をまたいでも成立する**。
+**※ `DTTables.FromDataSet(ds)` は `keepOriginal=false` 固定**なので、DataSet で保つときは上のように表ごとに `FromDataTable(dt, true)` で組み立てる。
+**既定（保持しない）のまま全列 `Original` 排他をすると、変更前値＝現在値になり DB の旧値と一致せず誤って「競合」＝件数0**になる
+（保持しない構成では `rowversion`/`timestamp` 列で排他する＝現在値のセルなので往復で保つ）。
 
 **★ バッチ更新を Web 画面で行うなら、`DataTable` を Session に持つ＝件数がメモリを圧迫する。**
 → **レコード件数に上限を設ける**か、**ページングを前提にする**（`opentouryo-app-design/references/list-paging.md`）。
@@ -83,6 +118,10 @@ Web で複数回のポストバックに跨って編集する場合、**編集�
   **素朴に `dt.Rows[e.RowIndex]` としない。**
 - **`DataKeyNames`＋`DataKeys[i]` はバッチ更新では使えない**（`opentouryo-layer-p-webforms-event` は通常これを勧めるが、
   **追加行の主キーが未採番＝`DBNull`** なので成立しない）。バッチ更新時は DataRow 側で対応付ける。
+- **★ IDENTITY 主キーの追加行は「負値で仮採番」する**：`ExecSelectFill_DT` は DB スキーマ（NOT NULL 制約）も取り込むため、
+  `NewRow()` した空行に主キーを入れないと `NoNullAllowedException:列 'SupplierID' に nulls を使用することはできません` になる（実測）。
+  一覧取得後に `pk.AutoIncrement = true; pk.AutoIncrementSeed = -1; pk.AutoIncrementStep = -1;` を設定し、**実データと衝突しない
+  負値で仮採番**する（INSERT には渡さない）。追加行にも主キーが付くので `dt.Rows.Find()` で引け、上の index ズレを index に頼らず解ける。
 - **セル編集は自動では `DataTable` に入らない** → グリッドのセルから **DataRow へ読み戻す**（`Modified` はこの代入で立つ）。
   **★ 元が `DBNull` の列に `""` を代入すると無駄な `Modified`（無駄 UPDATE）が量産される** → **現在値と一致するなら代入しない**。
   読み戻しスニペットは `references/snippets.md`。

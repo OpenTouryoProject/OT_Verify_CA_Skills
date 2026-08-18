@@ -3,6 +3,7 @@
 実環境（WebForms_Sample / net48 / 固定タグ `03-20` / 深いリポ パス）で**実際に通した2本**。
 本スキルが推奨する「生成スクリプトをリポジトリに残す・`.bat` より PowerShell ラッパ」の具体例で、
 既知の落とし穴（MAX_PATH＝短い作業ルート、exit code 不信＝DLL 実在で判定、`.\`＋`< nul`、
+**出力を `Select-Object -First N` で絞らない**〔下記〕、
 **2CS＝`Business.RichClient` の別 sln**、**ツールの `PackageReference` restore**）を織り込み済み。
 （※`build-app.ps1` は参照方式の更新に合わせて改訂：`WSServer_sample`/`WSIFType_sample` は ProjectReference＝
 1ソリューション一括ビルド。旧「WS を別ビルドして `WS_sample\Build\` へコピー」は不要。`samples/webservices.md`。）
@@ -19,7 +20,24 @@
 （配置維持）方針なら相対パスは配置に合わせて変える。**as-built の雛形なので、環境に合わせて調整する**
 （Configuration・restore 方式・msbuild 解決など）。
 
-## ★ 2ランタイムを1本に：`-Runtime` 引数化（#13）
+## ★ 実行時の罠：出力を `| Select-Object -First N` で絞らない（スクリプトごと止まる）
+
+これらのスクリプトを `... | Select-String … | Select-Object -First N` のように**出力を絞って**実行すると、
+PowerShell は上流パイプラインを**停止**するため、**スクリプトが途中で終了**する（例外は出ない＝静かな失敗）。実測2件：
+
+- `setup-build.ps1`：overlay 適用と `2_Build_NuGet` は流れたが **`3_Build_Business` に到達せず**、DLL が更新されないまま「成功したように見えた」（DLL のタイムスタンプで気付いた）。
+- `prune-csproj.ps1`：`pruned: N` と表示されたのに **`$xml.Save()` に到達せず csproj は無変更**（直後のビルドが `CS2001` 大量で落ちて初めて気付いた）。
+
+→ **長い出力は `Out-File` に落として後から grep する**（`Select-Object -First N` で絞らない）。上の「exit code 不信＝生成物の実在／タイムスタンプで判定」原則は、まさにこの事故を検出してくれる。
+
+## ★ 実行時の罠：`.ps1` の BOM は「通った＝安全」で判断しない（文字依存）
+
+SKILL 本文どおり、日本語コメントを含む `.ps1` を WinPS 5.1 で走らせるなら **BOM 付き保存／ASCII 化／`pwsh` 実行**のいずれかが要る。
+**★ 壊れるかは含む文字に依存する**：仮名・漢字だけの行は偶然通ることがあるが、**`★`(U+2605) 等の記号を含む行**で 5.1 が BOM 無し UTF-8 を誤読し、
+**文字列の閉じ引用符を飲み込んで `The string is missing the terminator: "` でスクリプト全体が構文エラー**になる（実測）。
+→ **「最小再現で壊れなかった＝予防措置で十分」と結論づけない。** 規約どおり BOM を付ける（`opentouryo-comment-convention` の「書き直したら毎回 BOM 確認」も同旨）。
+
+## ★ 2ランタイムを1本に：`-Runtime` 引数化
 
 下の2本（`setup-build.ps1`＝net48／`setup-build-netcore.ps1`＝netcore100）は**大半が重複**する。混在 repo
 （net48 済みに netcore100 を後から足す等）で毎回どちらを複製/改変するか迷わないよう、**`-Runtime net48|netcore100` の
@@ -32,9 +50,9 @@ $vendor = Join-Path $repo "OpenTouryoAssemblies\Build_$Runtime"
 ```
 
 ただし**ランタイム固有の分岐は残す**：**確認パス**は net48＝`Build_net48\` 直下／core＝`Build_netcore100\<TFM>\`
-（`net10.0\`・`net10.0-windows7.0\`）配下（#14）。**RichClient のビルド方式**は net48＝非SDK sln を `& $msb …/t:build`
+（`net10.0\`・`net10.0-windows7.0\`）配下。**RichClient のビルド方式**は net48＝非SDK sln を `& $msb …/t:build`
 （restore なし・obj パージ要）／core＝`.bat`。**core の欠落**は `net10.0-windows7.0\` が RichClient を回して初めて
-`Business`/`Dam*` が揃う（#19）。以下は分かりやすさのため別々に載せるが、実運用は `-Runtime` 1本に畳んでよい。
+`Business`/`Dam*` が揃う。以下は分かりやすさのため別々に載せるが、実運用は `-Runtime` 1本に畳んでよい。
 
 - `setup-build.ps1` — 本スキル ①②③（ZIP取得 → net48 基盤ビルド → ベンダ）。短パス `C:\otr` でビルド、
   `OpenTouryo.Business.dll` の実在で成否判定。**親クラス2 をカスタマイズするなら任意ブロック**（overlay 適用＋
@@ -64,7 +82,7 @@ $vendor  = Join-Path $repo 'OpenTouryoAssemblies\Build_net48'
 $overlay = Join-Path $repo 'base2-overlay'   # present only when customizing 親クラス2
 
 # --- 1. ZIP acquisition (not git clone) ---
-# ★ #1 pristine-build guard: an extract tree that a PREVIOUS run OVERLAID (base2)
+# ★ pristine-build guard: an extract tree that a PREVIOUS run OVERLAID (base2)
 #   is reused as-is here and silently vendors a NON-pristine DLL (old OLE/ODBC or
 #   handler removals persist; the diff never shows in build output). For a pristine
 #   ref (no overlay this round) rebuild the tree. Same $extract is reused by the
@@ -149,7 +167,7 @@ if (-not (Test-Path (Join-Path $vendor 'OpenTouryo.Business.dll'))) {
 # When RichClient was built (2CS / rich client target, OR base2 customizes 2CS), the
 # BusinessRichClient_net48.sln produces BOTH Business.RichClient AND CustomControl.RichClient
 # (2 projects in one sln). Verify BOTH were vendored -- a prior round vendored only
-# Business.RichClient and CustomControl.RichClient.dll was silently missing (#22).
+# Business.RichClient and CustomControl.RichClient.dll was silently missing.
 if ($needRichClient -or (Test-Path $overlay)) {
     foreach ($rc in 'OpenTouryo.Business.RichClient.dll','OpenTouryo.CustomControl.RichClient.dll') {
         if (-not (Test-Path (Join-Path $vendor $rc))) {
@@ -221,9 +239,10 @@ if ($needRichClient -and
 }
 ```
 
-> **既知の警告（本体側）**：core サンプル（例 Core MVC）は `log4net 3.2.0` を `PackageReference` で参照するため、
-> ビルドで **`NU1902`（脆弱性・中）** が出ることがある。**ビルドは通る**。本体のバージョン更新待ちの既知事項なので、
-> セットアップ側で無理に差し替えない（差し替えると本体構成から乖離する）。
+> **既知の警告（本体側・版依存）**：core サンプル（例 Core MVC）が参照する `log4net` の版により挙動が変わる。
+> **`3.2.0` ではビルドで `NU1902`（脆弱性・中）** が出ることがある（**ビルドは通る**）。**`3.3.0` 以降は解消＝0 警告**
+> （実測：develop の Core MVC は `3.3.0`）。いずれにせよ**セットアップ側で無理に差し替えない**（本体の版に従う。
+> 出ても無害・出なくても正常＝どちらでも「おかしい」と迷わない）。
 
 ## `build-app.ps1`（restore → WebForms ソリューションを一括ビルド → ツール）
 
@@ -232,11 +251,11 @@ if ($needRichClient -and
 ソリューションに WS 2プロジェクトを含めて一括ビルドすれば WS も同時に建つ。`MySql.Data`/`Oracle`（3rd-party）だけは
 DLL 参照のままベンダ先 `Build_net48\` を指す（`references/reference-rewrite.md`）。
 
-**★ restore 方式は sln ごとに違う（#23）＝1つに決め打ちしない**：
+**★ restore 方式は sln ごとに違う＝1つに決め打ちしない**：
 
 | sln の形 | 復元方式 |
 | --- | --- |
-| `packages.config` 有（非SDK net48・WebForms 等） | `nuget restore <sln>`（`-MSBuildPath` 明示＝#28） |
+| `packages.config` 有（非SDK net48・WebForms 等） | `nuget restore <sln>`（`-MSBuildPath` 明示） |
 | **`packages.config` 無 ＋ `PackageReference`（非SDK net48・2CS 等）** | `msbuild <sln> /t:restore,build`（`nuget restore` では復元されず `Microsoft.Data.SqlClient` 等が解決不能） |
 | SDK（core） | `dotnet build`（restore 込み） |
 
@@ -270,7 +289,7 @@ $wfSln = Join-Path $repo 'WebForms_Sample\WebForms_Sample.sln'
 # nuget.exe auto-detects an MSBuild and may grab the SSMS-bundled one -> `MSB4226`
 # (Microsoft.WebApplication.targets missing) on Web slns. It's only an error MESSAGE
 # (packages.config still restores, build succeeds) but reads as failure. Pin MSBuild
-# to the vswhere-resolved one (#28).
+# to the vswhere-resolved one.
 & $nuget restore $wfSln -MSBuildPath (Split-Path $msb)   # msbuild /t:restore won't restore packages.config
 if ($LASTEXITCODE -ne 0) { throw "nuget restore failed ($LASTEXITCODE)" }
 & $msb $wfSln /p:Configuration=Debug /nologo /v:m
